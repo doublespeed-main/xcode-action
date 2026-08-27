@@ -16,8 +16,8 @@ jobs:
           import PackageDescription
           let package = Package(name: "Fixture", targets: [.target(name: "Fixture"), .testTarget(name: "FixtureTests", dependencies: ["Fixture"])])
           P
-          echo 'public func add(_ a: Int, _ b: Int) -> Int { a + b }' > Sources/Fixture/Fixture.swift
-          printf 'import XCTest\n@testable import Fixture\nfinal class T: XCTestCase { func testAdd() { XCTAssertEqual(add(2, 2), 4) } }\n' > Tests/FixtureTests/T.swift
+          echo 'public func plus(_ a: Int, _ b: Int) -> Int { a + b }' > Sources/Fixture/Fixture.swift
+          printf 'import XCTest\n@testable import Fixture\nfinal class T: XCTestCase { func testAdd() { XCTAssertEqual(plus(2, 2), 4) } }\n' > Tests/FixtureTests/T.swift
       - uses: ./
         with:
           api-key: ${{ secrets.DS_API_KEY }}
