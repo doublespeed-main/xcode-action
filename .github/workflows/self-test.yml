@@ -1,0 +1,23 @@
+name: self-test
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fixture
+        run: |
+          mkdir -p Sources/Fixture Tests/FixtureTests
+          cat > Package.swift <<'P'
+          // swift-tools-version:5.9
+          import PackageDescription
+          let package = Package(name: "Fixture", targets: [.target(name: "Fixture"), .testTarget(name: "FixtureTests", dependencies: ["Fixture"])])
+          P
+          echo 'public func add(_ a: Int, _ b: Int) -> Int { a + b }' > Sources/Fixture/Fixture.swift
+          printf 'import XCTest\n@testable import Fixture\nfinal class T: XCTestCase { func testAdd() { XCTAssertEqual(add(2, 2), 4) } }\n' > Tests/FixtureTests/T.swift
+      - uses: ./
+        with:
+          api-key: ${{ secrets.DS_API_KEY }}

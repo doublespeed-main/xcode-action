@@ -1,0 +1,123 @@
+name: 'doublespeed Xcode'
+description: 'Build, test or archive an iOS app on the doublespeed Mac fleet from a Linux runner. Errors and failing tests become PR annotations.'
+author: 'doublespeed'
+branding:
+  icon: 'smartphone'
+  color: 'blue'
+
+inputs:
+  api-key:
+    description: 'doublespeed API key (dsx_…). Create one at https://mac.doublespeed.ai/dashboard → API keys. Store it as a repository secret.'
+    required: true
+  command:
+    description: 'build | test | archive'
+    required: false
+    default: 'test'
+  path:
+    description: 'Directory of the Xcode project / workspace / package (relative to the repo root)'
+    required: false
+    default: '.'
+  scheme:
+    description: 'Scheme to build (inferred when there is exactly one app scheme)'
+    required: false
+    default: ''
+  destination:
+    description: 'xcodebuild destination, e.g. platform=iOS Simulator,name=iPhone 16 Pro'
+    required: false
+    default: ''
+  xcode:
+    description: 'Required Xcode major or exact version, e.g. 16 or 16.4'
+    required: false
+    default: ''
+  configuration:
+    description: 'Debug or Release'
+    required: false
+    default: ''
+  args:
+    description: 'Extra `ds xcode` flags, e.g. --setting CODE_SIGNING_ALLOWED=NO --only-testing MyAppTests'
+    required: false
+    default: ''
+  api-url:
+    description: 'API base URL (only for self-hosted control planes)'
+    required: false
+    default: ''
+  fail-on-error:
+    description: 'Fail the step when the job does not succeed'
+    required: false
+    default: 'true'
+  ds-version:
+    description: 'Version of @doublespeed/ds to install'
+    required: false
+    default: 'latest'
+
+outputs:
+  job-id:
+    description: 'doublespeed job id'
+    value: ${{ steps.report.outputs.job-id }}
+  status:
+    description: 'succeeded | failed | cancelled'
+    value: ${{ steps.report.outputs.status }}
+  error-code:
+    description: 'Error code when the job failed (BUILD_FAILURE, TEST_FAILURE, …)'
+    value: ${{ steps.report.outputs.error-code }}
+  result-file:
+    description: 'Path to the JSONL result file'
+    value: ${{ steps.run.outputs.result-file }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Check for API key
+      shell: bash
+      run: |
+        if [ -z "${{ inputs.api-key }}" ]; then
+          echo "::error::No doublespeed API key. Add the DS_API_KEY secret (https://mac.doublespeed.ai/dashboard → API keys) and pass it as api-key. Note: pull requests from forks cannot read secrets."
+          exit 1
+        fi
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+
+    - name: Install ds
+      shell: bash
+      run: npm install -g "@doublespeed/ds@${{ inputs.ds-version }}" >/dev/null 2>&1 && echo "ds $(ds --version 2>/dev/null || echo installed)"
+
+    - name: Run on the Mac fleet
+      id: run
+      shell: bash
+      env:
+        DS_API_KEY: ${{ inputs.api-key }}
+        DS_API_URL: ${{ inputs.api-url }}
+      run: |
+        set +e
+        [ -z "$DS_API_URL" ] && unset DS_API_URL
+        OUT="$RUNNER_TEMP/ds-result.jsonl"
+        ARGS=(xcode "${{ inputs.command }}" "${{ inputs.path }}" --json)
+        [ -n "${{ inputs.scheme }}" ] && ARGS+=(--scheme "${{ inputs.scheme }}")
+        [ -n "${{ inputs.destination }}" ] && ARGS+=(--destination "${{ inputs.destination }}")
+        [ -n "${{ inputs.xcode }}" ] && ARGS+=(--xcode "${{ inputs.xcode }}")
+        [ -n "${{ inputs.configuration }}" ] && ARGS+=(--configuration "${{ inputs.configuration }}")
+        # shellcheck disable=SC2206
+        EXTRA=(${{ inputs.args }})
+        echo "ds ${ARGS[*]} ${EXTRA[*]}"
+        ds "${ARGS[@]}" "${EXTRA[@]}" > "$OUT"
+        echo "exit-code=$?" >> "$GITHUB_OUTPUT"
+        echo "result-file=$OUT" >> "$GITHUB_OUTPUT"
+        exit 0
+
+    - name: Report
+      id: report
+      shell: bash
+      env:
+        DS_PATH: ${{ inputs.path }}
+        DS_FAIL: ${{ inputs.fail-on-error }}
+        DS_EXIT: ${{ steps.run.outputs.exit-code }}
+      run: node "$GITHUB_ACTION_PATH/report.mjs" "${{ steps.run.outputs.result-file }}"
+
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: doublespeed-${{ inputs.command }}-${{ github.run_id }}-${{ github.run_attempt }}
+        path: ${{ steps.run.outputs.result-file }}
+        if-no-files-found: ignore
