@@ -46,20 +46,28 @@ out('status', job.status);
 out('error-code', job.error?.code ?? '');
 
 const diags = Array.isArray(job.diagnostics) ? job.diagnostics : [];
+const tests = job.result?.tests;
+// One annotation per (file, line): XCTest assertion failures arrive both as a diagnostic and as a
+// failed test case, and the same compile error can be reported per architecture.
+const seen = new Set();
 let annotated = 0;
+const annotate = (level, file, line, col, message) => {
+  if (annotated >= 50) return; // GitHub caps annotations per step
+  const key = `${file ?? ''}:${line ?? ''}:${message.slice(0, 60)}`;
+  if (seen.has(key)) return;
+  seen.add(key);
+  const props = [file ? `file=${escProp(rel(file))}` : null, line ? `line=${line}` : null, col ? `col=${col}` : null].filter(Boolean).join(',');
+  console.log(`::${level}${props ? ' ' + props : ''}::${esc(message)}`);
+  annotated++;
+};
+for (const c of tests?.cases ?? []) {
+  if (c.status === 'failed') annotate('error', c.file, c.line, undefined, `${c.suite}.${c.name}: ${c.failure_message ?? 'failed'}`);
+}
 for (const d of diags) {
   if (d.severity !== 'error' && d.severity !== 'warning') continue;
-  if (annotated >= 50) break; // GitHub caps annotations per step
-  const props = [d.file ? `file=${escProp(rel(d.file))}` : null, d.line ? `line=${d.line}` : null, d.column ? `col=${d.column}` : null].filter(Boolean).join(',');
-  console.log(`::${d.severity}${props ? ' ' + props : ''}::${esc(d.message)}`);
-  annotated++;
-}
-const tests = job.result?.tests;
-for (const c of tests?.cases ?? []) {
-  if (c.status !== 'failed' || annotated >= 50) continue;
-  const props = [c.file ? `file=${escProp(rel(c.file))}` : null, c.line ? `line=${c.line}` : null].filter(Boolean).join(',');
-  console.log(`::error${props ? ' ' + props : ''}::${esc(`${c.suite}.${c.name}: ${c.failure_message ?? 'failed'}`)}`);
-  annotated++;
+  // skip the diagnostic form of a test failure already annotated from the case list
+  if (d.file && d.line && [...seen].some((k) => k.startsWith(`${d.file}:${d.line}:`))) continue;
+  annotate(d.severity, d.file, d.line, d.column, d.message);
 }
 
 const ok = job.status === 'succeeded';
