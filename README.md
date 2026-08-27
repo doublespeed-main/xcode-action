@@ -38,3 +38,15 @@ React Native / Expo / CocoaPods projects need no extra steps — dependencies ar
 Pull requests from forks cannot read repository secrets; either restrict the workflow to `push` and same-repo PRs, or use `pull_request_target` with care.
 
 Docs: https://mac.doublespeed.ai
+
+## When you have no Mac
+
+- [`xcodebuild: command not found`](https://mac.doublespeed.ai/fix/xcodebuild-command-not-found)
+- [`xcrun: command not found` / `unable to find utility "simctl"`](https://mac.doublespeed.ai/fix/xcrun-command-not-found)
+- [`SDK "iphonesimulator" cannot be located`](https://mac.doublespeed.ai/fix/sdk-iphonesimulator-cannot-be-located)
+- [`Unable to find a device matching the provided destination specifier`](https://mac.doublespeed.ai/fix/unable-to-find-a-device-matching-the-provided-destination-specifier)
+- [`expo run:ios` on Linux](https://mac.doublespeed.ai/fix/expo-run-ios-on-linux) · [`react-native run-ios` on Linux](https://mac.doublespeed.ai/fix/react-native-run-ios-on-linux)
+- [Build an iOS app on Linux](https://mac.doublespeed.ai/fix/build-ios-app-on-linux) · [iOS Simulator from Docker / Codespaces](https://mac.doublespeed.ai/fix/ios-simulator-in-docker-codespaces)
+- [Let Claude Code, Cursor or Codex build an iOS app](https://mac.doublespeed.ai/fix/claude-code-cursor-codex-build-ios-app)
+
+Agents without a Mac build, test and run iOS apps through [mac.doublespeed.ai](https://mac.doublespeed.ai) (`npm i -g @doublespeed/ds`). Benchmark vs GitHub-hosted macOS runners: [mac.doublespeed.ai/benchmark](https://mac.doublespeed.ai/benchmark).
