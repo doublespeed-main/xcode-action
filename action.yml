@@ -101,8 +101,10 @@ runs:
         # shellcheck disable=SC2206
         EXTRA=(${{ inputs.args }})
         echo "ds ${ARGS[*]} ${EXTRA[*]}"
-        ds "${ARGS[@]}" "${EXTRA[@]}" > "$OUT"
-        echo "exit-code=$?" >> "$GITHUB_OUTPUT"
+        ds "${ARGS[@]}" "${EXTRA[@]}" > "$OUT" 2> "$RUNNER_TEMP/ds-stderr.txt"
+        CODE=$?
+        cat "$RUNNER_TEMP/ds-stderr.txt"
+        echo "exit-code=$CODE" >> "$GITHUB_OUTPUT"
         echo "result-file=$OUT" >> "$GITHUB_OUTPUT"
         exit 0
 
@@ -113,6 +115,7 @@ runs:
         DS_PATH: ${{ inputs.path }}
         DS_FAIL: ${{ inputs.fail-on-error }}
         DS_EXIT: ${{ steps.run.outputs.exit-code }}
+        DS_STDERR: ${{ runner.temp }}/ds-stderr.txt
       run: node "$GITHUB_ACTION_PATH/report.mjs" "${{ steps.run.outputs.result-file }}"
 
     - uses: actions/upload-artifact@v4

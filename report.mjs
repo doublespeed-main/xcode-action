@@ -15,16 +15,27 @@ let lines = [];
 try {
   lines = readFileSync(file, 'utf8').split('\n').filter(Boolean);
 } catch {
-  console.log('::error::ds produced no output (network or install problem)');
-  process.exit(1);
+  lines = [];
+}
+let stderr = '';
+try {
+  stderr = process.env.DS_STDERR ? readFileSync(process.env.DS_STDERR, 'utf8').trim() : '';
+} catch {
+  /* none */
 }
 const last = lines[lines.length - 1];
 let job;
 try {
   job = JSON.parse(last);
 } catch {
-  console.log(`::error::could not parse ds output: ${last?.slice(0, 200)}`);
-  process.exit(1);
+  // ds exited before producing a result (auth, sync, network, install). Its last stderr line is the reason.
+  const reason = (stderr.split('\n').filter(Boolean).pop() || last || `ds exited with code ${process.env.DS_EXIT ?? '?'} and no output`).slice(0, 400);
+  const hint = /HTTP_401|UNAUTHORIZED/.test(reason) ? ' — check the DS_API_KEY secret' : /INSUFFICIENT_CREDITS|HTTP_402/.test(reason) ? ' — add credits at https://mac.doublespeed.ai/dashboard' : /SOURCE_NOT_READY|HTTP_409/.test(reason) ? ' — source upload did not complete; re-run the job' : '';
+  console.log(`::error::${esc(reason)}${hint}`);
+  summary(`## ❌ doublespeed ${process.argv[3] ?? ''} — did not run\n\n\`\`\`\n${reason}\n\`\`\``);
+  out('status', 'failed');
+  out('error-code', (reason.match(/^(?:error: )?([A-Z_0-9]+)/) || [])[1] || 'CLI_ERROR');
+  process.exit(failOnError ? 1 : 0);
 }
 if (job.event) {
   // stream ended before the final job object (e.g. CLI exited early); surface what we have
